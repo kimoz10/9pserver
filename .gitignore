@@ -5,3 +5,4 @@ client
 9p_dump.out
 debug.out
 *.o
+src/server
