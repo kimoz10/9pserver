@@ -93,13 +93,13 @@ void thread_function(void *newsockfd_ptr){
 	init_9p_obj(test_p9_obj);
 	newsockfd = *(int *)newsockfd_ptr;
 	while((n = read(newsockfd, buffer, 9000))!=0){
-		/* DEBUGGING
+
 		for(int i = 0; i < n; i++){
 			fprintf(stderr, "%d ", buffer[i]);
 		}
 
 		fprintf(stderr, "\n");
-		*/
+
 		/* decode the buffer and create the T object */
 		decode(buffer, T_p9_obj);
 		/* Print the T object in a friendly manner */

@@ -171,17 +171,30 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			R_p9_obj -> iounit = 0;
 			if(R_p9_obj -> qid -> type == 0 ){ //this is a regular file
 				int fd = -1;
+				assert((T_p9_obj -> mode & 0x10) != 0x10 );
+				if((T_p9_obj->mode != 0) && (T_p9_obj -> mode != 1) && (T_p9_obj -> mode != 2)){
+					printf("UNFAMILIAR MODE %d\n", T_p9_obj->mode);
+					exit(1);
+				}
 				switch(T_p9_obj -> mode){
 				case 0:
+					printf("opening file %s for read only\n", fnode -> path);
 					fd = open(fnode -> path, O_RDONLY);
 					break;
 				case 1:
-					fd = open(fnode->path, O_WRONLY);
+					printf("opening file %s for write only\n", fnode -> path);
+					fd = open(fnode->path, O_WRONLY | O_TRUNC);
 					break;
 				case 2:
+					printf("opening file %s for read write\n", fnode -> path);
 					fd = open(fnode -> path, O_RDWR);
 					break;
+				default:
+					printf("mode is different\n");
+					printf(" %d\n", T_p9_obj -> mode);
+					//exit(1);
 				}
+
 				fnode -> fd = fd;
 				assert(fnode -> fd != -1);
 			}
@@ -232,7 +245,7 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			else{ //assuming it is a directory(however there are things other than files and directories)
 				int fd = fnode -> fd; /* the file descriptor of the *should be open* file */
 				int count = T_p9_obj -> count;
-				int read_bytes = read(fd, data, count);
+				int read_bytes = UNIX_read(fd, data, T_p9_obj -> offset, count);
 				R_p9_obj -> count = read_bytes;
 				R_p9_obj -> data = data;
 				R_p9_obj -> size = 4 + 2 + 4 + 1 + R_p9_obj -> count;
@@ -253,6 +266,10 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			fid_node *fnode = fid_table_find_fid(fid_table, fid);
 			assert(fnode != NULL);
 			assert(fnode -> fd != -1); /* file must be open */
+			printf("DATA\n");
+			for(int i = 0; i < T_p9_obj -> count; i++){
+				printf("%d ", T_p9_obj -> data[i]);
+			}
 			int write_count = UNIX_write(fnode -> fd, offset, T_p9_obj -> data, count);
 			R_p9_obj -> count = write_count;
 			break;

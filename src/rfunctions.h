@@ -43,6 +43,8 @@ void UNIX_change_permissions(char *path, uint32_t mode);
 
 int UNIX_write(int fd, unsigned long long offset, uint8_t *data, int count);
 
+int UNIX_read(int fd, uint8_t *data, unsigned long long offset, int count);
+
 int UNIX_remove(char *path);
 
 #endif /* SRC_RFUNCTIONS_H_ */
