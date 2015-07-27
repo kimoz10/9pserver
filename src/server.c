@@ -14,6 +14,7 @@
 #include "rmessage.h"
 #include "fid.h"
 
+
 void error(char *msg)
 {
     perror(msg);
@@ -93,17 +94,20 @@ void thread_function(void *newsockfd_ptr){
 	init_9p_obj(test_p9_obj);
 	newsockfd = *(int *)newsockfd_ptr;
 	while((n = read(newsockfd, buffer, 9000))!=0){
-
+#ifdef DEBUG
 		for(int i = 0; i < n; i++){
-			fprintf(stderr, "%d ", buffer[i]);
+			printf(stderr, "%d ", buffer[i]);
 		}
 
 		fprintf(stderr, "\n");
+#endif
 
 		/* decode the buffer and create the T object */
 		decode(buffer, T_p9_obj);
 		/* Print the T object in a friendly manner */
+#ifdef DEBUG
 		print_p9_obj(T_p9_obj);
+#endif
 		/* prepare the RMessage */
 		prepare_reply(T_p9_obj, R_p9_obj, fid_table);
 		/***************************/
@@ -112,16 +116,20 @@ void thread_function(void *newsockfd_ptr){
 		uint8_t * Rbuffer = encode(R_p9_obj);
 
 		/* Check that the message buffer represents the R object */
+#ifdef DEBUG
 		decode(Rbuffer, test_p9_obj);
 		assert(compare_9p_obj(R_p9_obj, test_p9_obj)==1);
 		/* after checking. print and send */
 		/* print the R P9 object in a friendly way */
 		print_p9_obj(R_p9_obj);
+#endif
 		/* send the message buffer */
+#ifdef DEBUG
 		for(int i = 0; i < R_p9_obj -> size; i++){
 			fprintf(stderr, "%d ", Rbuffer[i]);
 		}
 		fprintf(stderr, "\n");
+#endif
 		write(newsockfd, Rbuffer, R_p9_obj -> size);
 		/***************************/
 		destroy_p9_obj(T_p9_obj);

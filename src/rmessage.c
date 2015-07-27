@@ -49,9 +49,6 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 				perror("TSTAT a file that is not in the fid table\n");
 				exit(1);
 			}
-			else{
-				printf("TSTAT message is asking for the status of file %s\n", fnode -> path);
-			}
 			make_stat_from_UNIX_file(fnode -> path, R_p9_obj -> stat);
 			if(R_p9_obj -> stat -> qid -> type == 128){
 				R_p9_obj -> stat -> length = 0;
@@ -107,7 +104,6 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 						int error_len = strlen(error_msg);
 						R_p9_obj -> size = 7 + 2 + error_len;
 						R_p9_obj -> ename_len = error_len;
-						printf("ename_len initially %d\n", R_p9_obj -> ename_len);
 						R_p9_obj -> ename = error_msg;
 						R_p9_obj -> tag = T_p9_obj -> tag;
 					}
@@ -129,7 +125,7 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 
 						}
 						/* newfid will be affected only if nwqid == nwnames */
-						printf("path is %s\n", path);
+
 						if(nwqid == T_p9_obj -> nwname){
 							/* path is now the full path */
 							fid_node *fnode = fid_table_find_fid(fid_table, T_p9_obj -> newfid);
@@ -178,21 +174,27 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 				}
 				switch(T_p9_obj -> mode){
 				case 0:
+#ifdef DEBUG
 					printf("opening file %s for read only\n", fnode -> path);
+#endif
 					fd = open(fnode -> path, O_RDONLY);
 					break;
 				case 1:
+#ifdef DEBUG
 					printf("opening file %s for write only\n", fnode -> path);
+#endif
 					fd = open(fnode->path, O_WRONLY | O_TRUNC);
 					break;
 				case 2:
+#ifdef DEBUG
 					printf("opening file %s for read write\n", fnode -> path);
+#endif
 					fd = open(fnode -> path, O_RDWR);
 					break;
 				default:
 					printf("mode is different\n");
 					printf(" %d\n", T_p9_obj -> mode);
-					//exit(1);
+					exit(1);
 				}
 
 				fnode -> fd = fd;
@@ -266,10 +268,12 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			fid_node *fnode = fid_table_find_fid(fid_table, fid);
 			assert(fnode != NULL);
 			assert(fnode -> fd != -1); /* file must be open */
+#ifdef DEBUG
 			printf("DATA\n");
 			for(int i = 0; i < T_p9_obj -> count; i++){
 				printf("%d ", T_p9_obj -> data[i]);
 			}
+#endif
 			int write_count = UNIX_write(fnode -> fd, offset, T_p9_obj -> data, count);
 			R_p9_obj -> count = write_count;
 			break;
@@ -311,7 +315,9 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			strcat(newpathname, fnode->path);
 			strcat(newpathname, "/");
 			strcat(newpathname, T_p9_obj -> name);
+#ifdef DEBUG
 			printf("ATTEMPTING TO CREATE %s\n", newpathname);
+#endif
 			/* this fid should represent the newly created file now */
 			fnode -> path = newpathname;
 			fnode -> dd = 0;
@@ -365,7 +371,6 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 		{
 			int fid = T_p9_obj -> fid;
 			stat_t *s_new = T_p9_obj -> stat;
-			int stat_len = T_p9_obj -> stat_len;
 			fid_node *fnode = fid_table_find_fid(fid_table, fid);
 			if(fnode == NULL){
 				perror("writing stat to non existing file\n");
@@ -378,12 +383,11 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			/* only name, uid, gid, permission part of the mode can be changed
 			 *
 			 */
-			if(s_old -> length != s_new -> length){
-				//handle this case here
-				//printf("LENGTH required to change from %d to %d\n!\n", s_old -> length, s_new -> length);
-			}
+			/* it does not make any sense to change the length */
 			if((strcmp(s_new -> name, "")!= 0) && (strcmp(s_old -> name, s_new -> name) != 0)){
+#ifdef DEBUG
 				printf("RENAMING: %s to %s\n", s_old -> name, s_new -> name);
+#endif
 				if(T_p9_obj -> stat -> qid -> type == 128){
 					/* TODO: check permissions */
 					UNIX_rename_directory(fnode -> path, s_new -> name);
@@ -396,7 +400,9 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 
 			if(s_new -> mode != 0xffffffff && s_old -> mode != s_new -> mode){
 				/* only change the permissions */
+#ifdef DEBUG
 				printf("MODE required to change from %d to %d!\n", s_old -> mode, s_new -> mode);
+#endif
 				UNIX_change_permissions(fnode->path, s_new -> mode);
 			}
 			R_p9_obj -> size = 7;

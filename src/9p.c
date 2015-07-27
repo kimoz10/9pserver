@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
-
+#include <inttypes.h>
 
 
 int int_pow(int x, int y){
@@ -86,10 +86,12 @@ qid_t **decode_wqid(uint8_t *msg_buffer, int nwqid, int start_idx){
 
 stat_t *decode_stat(uint8_t *msg_buffer, int start_idx, int length){
 	stat_t *s = (stat_t *) malloc(sizeof(stat_t));
-	int size = buffer_bytes_to_int(msg_buffer, start_idx, 2);
+	buffer_bytes_to_int(msg_buffer, start_idx, 2);
 	//printf("stat_len %d\n", length);
 	//printf("size field %d\n", size);
+#ifdef DEBUG
 	assert(size == (length - 2));
+#endif
 	s->type = buffer_bytes_to_int(msg_buffer, start_idx + 2, 2);
 	s->dev = buffer_bytes_to_int(msg_buffer, start_idx + 4, 4);
 	s -> qid = decode_qid(msg_buffer, start_idx + 8, 13);
@@ -186,7 +188,6 @@ void decode(uint8_t* msg_buffer, p9_obj_t *p9_obj){
 	char *version;
 	char *name;
 	uint8_t *data;
-	uint8_t *stat;
 	p9_obj -> size = (uint32_t) buffer_bytes_to_int(msg_buffer, 0, 4);
 	p9_obj -> type = msg_buffer[4];
 	p9_obj -> tag  = (uint16_t) buffer_bytes_to_int(msg_buffer, 5, 2);
@@ -227,7 +228,7 @@ void decode(uint8_t* msg_buffer, p9_obj_t *p9_obj){
 			break;
 		case P9_RERROR:
 			p9_obj -> ename_len = buffer_bytes_to_int(msg_buffer, 7, 2);
-			//fprintf(stderr, "ename_len %d\n", p9_obj -> ename_len);
+			//fprintf(stderr, "ename_len %d\n", p9_obj -> ename_len);//
 			p9_obj -> ename = (char *) malloc(p9_obj -> ename_len * sizeof(char) + 1);
 			bzero(p9_obj -> ename, p9_obj -> ename_len + 1);
 			buffer_bytes_to_string(msg_buffer, 9, p9_obj -> ename_len, p9_obj -> ename);
@@ -408,7 +409,7 @@ void print_qid(qid_t *qid){
 	/* should print the qid here */
 	printf("qid type: %d\n", qid -> type);
 	printf("qid version: %d\n", qid -> version);
-	printf("qid path: %llu\n", qid -> path);
+	printf("qid path: %"PRIu64"\n", qid -> path);
 }
 
 void print_stat(stat_t *s){
@@ -419,9 +420,9 @@ void print_stat(stat_t *s){
 	printf("gid %s\n", s->gid);
 	printf("uid %s\n", s->uid);
 	printf("muid %s\n", s->muid);
-	printf("mode %lu\n", s->mode);
-	printf("type: %lu\n", s->type);
-	printf("length: %d\n", s->length);
+	printf("mode %"PRIu32"\n", s->mode);
+	printf("type: %"PRIu16"\n", s->type);
+	printf("length: %"PRIu64"\n", s->length);
 	print_qid(s->qid);
 }
 
@@ -512,7 +513,7 @@ void print_p9_obj(p9_obj_t *p9_obj){
 			break;
 		case P9_TREAD:
 			printf("fid: %u\n", p9_obj -> fid);
-			printf("offset: %llu\n", p9_obj -> offset);
+			printf("offset: %"PRIu64"\n", p9_obj -> offset);
 			printf("count: %u\n", p9_obj -> count);
 			break;
 		case P9_RREAD:
@@ -521,7 +522,7 @@ void print_p9_obj(p9_obj_t *p9_obj){
 			break;
 		case P9_TWRITE:
 			printf("fid: %u\n", p9_obj -> fid);
-			printf("offset: %llu\n", p9_obj -> offset);
+			printf("offset: %"PRIu64"\n", p9_obj -> offset);
 			printf("count: %u\n", p9_obj -> count);
 			/* maybe print the data */
 			break;

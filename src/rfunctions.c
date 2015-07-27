@@ -89,7 +89,9 @@ void create_directory(char *pathname, char* filename){
 	strcat(s, pathname);
 	strcat(s, "/");
 	strcat(s,filename);
+#ifdef DEBUG
 	printf("trying to create directory %s\n", s);
+#endif
 	errno = 0;
 	if(mkdir(s, 0755)!=0){
 		printf("error number %d\n", errno);
@@ -120,15 +122,12 @@ void UNIX_rename_directory(char *path, char *new_name){
 }
 
 void UNIX_rename_file(char *path, char *new_name){
-	printf("ATTAMPTING TO RENAME\n");
 	char *last = strrchr(path, '/');
 	int len = (int)(last - path + 1);
 	char *new_path = (char *) malloc(1000 * sizeof(char));
 	bzero(new_path, 1000);
 	strncat(new_path, path, len);
 	strcat(new_path, new_name);
-	printf("old path %s\n", path);
-	printf("new_path %s\n", new_path);
 	assert(rename(path, new_path) == 0);
 	free(new_path);
 }

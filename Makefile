@@ -1,5 +1,5 @@
 CC     = gcc
-CFLAGS = -D_REENTRANT -g -Wall -pedantic -Isrc -std=c99
+CFLAGS = -D_REENTRANT -g -Wall -pedantic -Isrc -std=gnu99
 LDLIBS = -lpthread
 
 all: src/9p.o src/threadpool.o src/server.o src/rmessage.o src/rfunctions.o src/fid.o

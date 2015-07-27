@@ -98,7 +98,6 @@ void fid_table_add_fid(fid_list **fid_table, uint32_t fid, char* path){
 		exit(1);
 	}
 	int entry = fid % HTABLE_SIZE;
-	if(fid_table[entry] != NULL)printf("entry is %d\n", entry);
 	/* handling the case when there is no fid_list in the entry */
 
 
