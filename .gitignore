@@ -3,3 +3,4 @@ server
 .project
 9p_dump.out
 debug.out
+*.o
