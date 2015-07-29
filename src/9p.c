@@ -5,17 +5,17 @@
 #include <stdio.h>
 #include <assert.h>
 #include <inttypes.h>
+#include <stdint.h>
 
-
-int int_pow(int x, int y){
+unsigned long long int_pow(int x, int y){
 	if(y == 0) return 1;
 	else return x * int_pow(x, y - 1);
 }
 
-void int_to_buffer_bytes(unsigned long long n, uint8_t *msg_buffer, int start_idx, int length){
+void int_to_buffer_bytes(uint64_t n, uint8_t *msg_buffer, int start_idx, int length){
 	int i;
 	for(i = 0; i < length; i++) {
-		msg_buffer[start_idx + i] = (n >> (8 * i)) & 0xff;
+		msg_buffer[start_idx + i] = (n >> (8 * i)) & 255ULL;
 	}
 }
 
@@ -89,9 +89,6 @@ stat_t *decode_stat(uint8_t *msg_buffer, int start_idx, int length){
 	buffer_bytes_to_int(msg_buffer, start_idx, 2);
 	//printf("stat_len %d\n", length);
 	//printf("size field %d\n", size);
-#ifdef DEBUG
-	assert(size == (length - 2));
-#endif
 	s->type = buffer_bytes_to_int(msg_buffer, start_idx + 2, 2);
 	s->dev = buffer_bytes_to_int(msg_buffer, start_idx + 4, 4);
 	s -> qid = decode_qid(msg_buffer, start_idx + 8, 13);

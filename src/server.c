@@ -13,6 +13,7 @@
 #include "9p.h"
 #include "rmessage.h"
 #include "fid.h"
+#include <stdint.h>
 
 
 void error(char *msg)
@@ -82,7 +83,7 @@ void thread_function(void *newsockfd_ptr){
 	/* end of fid_table allocation */
     assert(fid_table[0] == NULL);
     buffer = (uint8_t *)malloc(9000 * sizeof(char));
-	p9_obj_t *T_p9_obj;
+   	p9_obj_t *T_p9_obj;
 	p9_obj_t *R_p9_obj;
 	p9_obj_t *test_p9_obj;
 	bzero(buffer, 256);

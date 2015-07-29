@@ -2,6 +2,9 @@
 #define NP_H
 
 #include <stdint.h>
+/*
+#define DEBUG 	1
+*/
 #define P9_NOTAG	(u16)(~0)
 #define P9_NOFID	(u32)(~0)
 #define P9_MAXWELEM	16
@@ -122,7 +125,7 @@ typedef struct p9_obj_t{
 	wname_node *wname_list;
 } p9_obj_t;
 
-void int_to_buffer_bytes(unsigned long long n, uint8_t *msg_buffer, int start_idx, int length);
+void int_to_buffer_bytes(uint64_t n, uint8_t *msg_buffer, int start_idx, int length);
 
 void string_to_buffer_bytes(char* s, uint8_t* msg_buffer, int start_idx, int length);
 
