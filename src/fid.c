@@ -36,8 +36,10 @@ void add_fid_node(struct fid_list *flist, uint32_t fid, char *path){
  */
 
 int remove_fid_from_list(struct fid_list *flist, uint32_t fid){
-	if(flist == NULL || flist -> head == NULL) return -1;
 	fid_node *temp;
+	fid_node *current;
+	fid_node *prev;
+	if(flist == NULL || flist -> head == NULL) return -1;
 	/* if it is the first element of the list. remove it and change the flist head */
 	if(flist -> head -> fid == fid){
 		temp = flist -> head;
@@ -46,8 +48,6 @@ int remove_fid_from_list(struct fid_list *flist, uint32_t fid){
 		free(temp);
 		return 0;
 	}
-	fid_node *current;
-	fid_node *prev;
 	prev = flist -> head;
 	current = flist -> head -> next;
 	while(current != NULL){
@@ -63,8 +63,9 @@ int remove_fid_from_list(struct fid_list *flist, uint32_t fid){
 }
 
 fid_node *find_fid_node_in_list(struct fid_list *flist, uint32_t fid){
+	fid_node *current;
 	if(flist == NULL || flist -> head == NULL) return NULL;
-	fid_node *current = flist -> head;
+	current = flist -> head;
 	while(current != NULL){
 		if(current -> fid == fid) return current;
 	}
@@ -86,23 +87,27 @@ fid_node *create_fid_node(uint32_t fid, char* path){
 
 /* creates and initializes the fid_table */
 fid_list **fid_table_init(){
-	fid_list  **fid_table = (fid_list **) malloc(HTABLE_SIZE * sizeof(fid_list *));
-	for(int i = 0; i < HTABLE_SIZE; i++){
+	fid_list  **fid_table;
+	int i;
+	fid_table = (fid_list **) malloc(HTABLE_SIZE * sizeof(fid_list *));
+	for(i = 0; i < HTABLE_SIZE; i++){
 		fid_table[i] = NULL;
 	}
 	return fid_table;
 }
+
 void fid_table_add_fid(fid_list **fid_table, uint32_t fid, char* path){
+	int entry;
 	if(fid_table == NULL){
 		perror("Attempting to add to a null pointer fid_table\n");
 		exit(1);
 	}
-	int entry = fid % HTABLE_SIZE;
+	entry = fid % HTABLE_SIZE;
 	/* handling the case when there is no fid_list in the entry */
-
-
 	if(fid_table[entry] == NULL){
-		fid_list *flist = create_fid_list(flist);
+		fid_list *flist;
+		flist = NULL;
+		flist = create_fid_list();
 		add_fid_node(flist, fid, path);
 		fid_table[entry] = flist;
 	}
@@ -113,7 +118,8 @@ void fid_table_add_fid(fid_list **fid_table, uint32_t fid, char* path){
 }
 
 struct fid_node *fid_table_find_fid(fid_list **fid_table, uint32_t fid){
-	int entry = fid % HTABLE_SIZE;
+	int entry;
+	entry = fid % HTABLE_SIZE;
 	if(fid_table[entry] == NULL) return NULL;
 	return find_fid_node_in_list(fid_table[entry], fid);
 }
@@ -121,11 +127,13 @@ struct fid_node *fid_table_find_fid(fid_list **fid_table, uint32_t fid){
 /* returns 0 on success. -1 on failure or if element is not found */
 /* This should also close any open file/directory opened by this fid */
 int fid_table_remove_fid(fid_list **fid_table, uint32_t fid){
-	int entry = fid % HTABLE_SIZE;
-	if(fid_table[entry] == NULL) return -1;
-	fid_node *fnode = find_fid_node_in_list(fid_table[entry], fid);
-	if(fnode == NULL) return -1;
+	int entry;
+	fid_node *fnode;
 	struct stat s;
+	entry = fid % HTABLE_SIZE;
+	if(fid_table[entry] == NULL) return -1;
+	fnode = find_fid_node_in_list(fid_table[entry], fid);
+	if(fnode == NULL) return -1;
 	if(stat(fnode -> path, &s) == 0){
 		if (S_ISDIR(s.st_mode)){
 			if(fnode -> dd != 0){

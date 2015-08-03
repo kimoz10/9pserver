@@ -61,9 +61,11 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			/* The case where newfid == fid should be handled separately
 			 * 												*/
 			if(fid_table_find_fid(fid_table, T_p9_obj -> newfid) != NULL && T_p9_obj -> newfid != T_p9_obj -> fid){
+				char *error_msg;
+				int error_len;
 				R_p9_obj -> type = P9_RERROR;
-				char *error_msg = "newfid is in use and it is not equal to fid\n";
-				int error_len = strlen(error_msg);
+				error_msg = "newfid is in use and it is not equal to fid\n";
+				error_len = strlen(error_msg);
 				R_p9_obj -> size = 7 + 2 + error_len;
 				R_p9_obj -> ename_len = error_len;
 				R_p9_obj -> ename = error_msg;
@@ -71,7 +73,8 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			}
 			else{ //newfid is not being used or newfid == fid (should be the same case until we change the fid_table)
 
-				fid_node *fnode = fid_table_find_fid(fid_table, T_p9_obj -> fid);
+				fid_node *fnode;
+				fnode = fid_table_find_fid(fid_table, T_p9_obj -> fid);
 				if(fnode == NULL || fnode -> fd != -1){
 					if(!fnode)perror("TWALK message received with an fid that is open\n");
 					else perror("TWALK message received with an fid that does not exist in the fid table");
@@ -87,11 +90,13 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 				else{ //nwname != 0
 					/* Check if the first element is walkable, if not an RERROR will return */
 					/* first get the number of nwqids */
-					char *path = (char *)malloc(1000 * sizeof(char));
+					char *path;
+					int nwqid, i;
+					path = (char *)malloc(1000 * sizeof(char));
 					strcpy(path, fnode -> path);
 					assert(path);
-					int nwqid = 0;
-					for(int i = 0; i < T_p9_obj -> nwname; i++){
+					nwqid = 0;
+					for(i = 0; i < T_p9_obj -> nwname; i++){
 						strcat(path, "/");
 						strcat(path, (T_p9_obj -> wname_list + i) -> wname);
 						if(is_file_exists(path) != -1) nwqid++;
@@ -99,9 +104,11 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 
 					if(nwqid == 0){
 						/* First element does not exist. return RERROR */
+						char *error_msg;
+						int error_len;
 						R_p9_obj -> type = P9_RERROR;
-						char *error_msg = "No such file or directory";
-						int error_len = strlen(error_msg);
+						error_msg = "No such file or directory";
+						error_len = strlen(error_msg);
 						R_p9_obj -> size = 7 + 2 + error_len;
 						R_p9_obj -> ename_len = error_len;
 						R_p9_obj -> ename = error_msg;
@@ -109,6 +116,7 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 					}
 						/* The first element is walkabale. RWALK will return	*/
 					else{
+						int i;
 						bzero(path, 1000);
 						strcpy(path, fnode -> path);
 						R_p9_obj -> type = P9_RWALK;
@@ -116,10 +124,11 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 						R_p9_obj -> size = 7 + 2 + nwqid * 13;
 						R_p9_obj -> nwqid = nwqid;
 						R_p9_obj -> wqid = (qid_t **) malloc(nwqid * sizeof(qid_t *));
-						for(int i = 0; i < nwqid; i++){
+						for(i = 0; i < nwqid; i++){
+							qid_t *qid;
 							strcat(path, "/");
 							strcat(path, (T_p9_obj -> wname_list + i) -> wname);
-							qid_t *qid = (qid_t *) malloc(sizeof(qid_t));
+							qid = (qid_t *) malloc(sizeof(qid_t));
 							make_qid_from_UNIX_file(path, qid);
 							R_p9_obj -> wqid[i] = qid;
 
@@ -128,7 +137,8 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 
 						if(nwqid == T_p9_obj -> nwname){
 							/* path is now the full path */
-							fid_node *fnode = fid_table_find_fid(fid_table, T_p9_obj -> newfid);
+							fid_node *fnode;
+							fnode = fid_table_find_fid(fid_table, T_p9_obj -> newfid);
 							if(fnode != NULL){
 								//fid = newfid case
 								fnode -> fid = T_p9_obj -> newfid;
@@ -166,7 +176,8 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			make_qid_from_UNIX_file(fnode->path, R_p9_obj -> qid);
 			R_p9_obj -> iounit = 0;
 			if(R_p9_obj -> qid -> type == 0 ){ //this is a regular file
-				int fd = -1;
+				int fd;
+				fd = -1;
 				assert((T_p9_obj -> mode & 0x10) != 0x10 );
 				if((T_p9_obj->mode != 0) && (T_p9_obj -> mode != 1) && (T_p9_obj -> mode != 2)){
 					printf("UNFAMILIAR MODE %d\n", T_p9_obj->mode);
@@ -208,28 +219,32 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 		case P9_TREAD:
 			{//defining a scope in the case statement
 			int fid;
+			uint8_t *data;
 			fid = T_p9_obj -> fid;
 			fnode = fid_table_find_fid(fid_table, fid);
 			assert(fnode != NULL);
-			uint8_t *data = (uint8_t *) malloc(T_p9_obj -> count * sizeof(uint8_t));
+			data = (uint8_t *) malloc(T_p9_obj -> count * sizeof(uint8_t));
 			bzero(data, T_p9_obj -> count);
 			/* handling the directory case */
 			if(fnode -> fd == -1){ //this must be a directory then
 				struct dirent *entry;
-				int idx = 0;
-
-				char *newpathname = (char *) malloc(1000 * sizeof(char));
+				int idx;
+				char *newpathname;
+				newpathname = (char *) malloc(1000 * sizeof(char));
+				idx = 0;
 				while((entry = readdir(fnode -> dd))){
+					char *entry_name;
+					stat_t *s;
 					bzero(newpathname, 1000);
 					strcpy(newpathname, fnode -> path);
 					if(!strcmp(entry->d_name, "."))
 						continue;
 					if(!strcmp(entry->d_name, ".."))
 						continue;
-					char *entry_name = entry->d_name;
+					entry_name = entry->d_name;
 					newpathname = strcat(newpathname, "/");
 					newpathname = strcat(newpathname, entry_name);
-					stat_t *s = (stat_t *) malloc(sizeof(stat_t));
+					s = (stat_t *) malloc(sizeof(stat_t));
 					make_stat_from_UNIX_file(newpathname, s);
 					encode_stat(s, data, idx, get_stat_length(s));
 					idx += (2 + get_stat_length(s));
@@ -245,9 +260,10 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			}
 			/* handling the file case */
 			else{ //assuming it is a directory(however there are things other than files and directories)
-				int fd = fnode -> fd; /* the file descriptor of the *should be open* file */
-				int count = T_p9_obj -> count;
-				int read_bytes = UNIX_read(fd, data, T_p9_obj -> offset, count);
+				int fd, count, read_bytes;
+				fd = fnode -> fd; /* the file descriptor of the *should be open* file */
+				count = T_p9_obj -> count;
+				read_bytes = UNIX_read(fd, data, T_p9_obj -> offset, count);
 				R_p9_obj -> count = read_bytes;
 				R_p9_obj -> data = data;
 				R_p9_obj -> size = 4 + 2 + 4 + 1 + R_p9_obj -> count;
@@ -259,34 +275,44 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			}//ending scope
 		case P9_TWRITE:
 		{
+			int fid, count, write_count;
+#ifdef DEBUG
+			int i;
+#endif
+			unsigned long long offset;
+			fid_node *fnode;
 			R_p9_obj -> size = 11;
 			R_p9_obj -> type = P9_RWRITE;
 			R_p9_obj -> tag = T_p9_obj -> tag;
-			int fid = T_p9_obj -> fid;
-			unsigned long long offset = T_p9_obj -> offset;
-			int count = T_p9_obj -> count;
-			fid_node *fnode = fid_table_find_fid(fid_table, fid);
+			fid = T_p9_obj -> fid;
+			offset = T_p9_obj -> offset;
+			count = T_p9_obj -> count;
+			fnode = fid_table_find_fid(fid_table, fid);
 			assert(fnode != NULL);
 			assert(fnode -> fd != -1); /* file must be open */
 #ifdef DEBUG
 			printf("DATA\n");
-			for(int i = 0; i < T_p9_obj -> count; i++){
+			for(i = 0; i < T_p9_obj -> count; i++){
 				printf("%d ", T_p9_obj -> data[i]);
 			}
 #endif
-			int write_count = UNIX_write(fnode -> fd, offset, T_p9_obj -> data, count);
+			write_count = UNIX_write(fnode -> fd, offset, T_p9_obj -> data, count);
 			R_p9_obj -> count = write_count;
 			break;
 		}//ending scope
 		case P9_TCREATE:
 			{
-			int fid = T_p9_obj -> fid;
+			int fid;
+			struct stat *s;
+			uint32_t perm;
+			char *newpathname;
+			fid = T_p9_obj -> fid;
 			fnode = fid_table_find_fid(fid_table, fid);
 			if(fnode == NULL){
 				perror("Trying to create a new file in a directory that does not exist in the fid_table\n");
 				exit(1);
 			}
-			struct stat *s = (struct stat *)malloc(sizeof(struct stat));
+			s = (struct stat *)malloc(sizeof(struct stat));
 			if(stat(fnode -> path, s)==0){
 				if(!S_ISDIR(s->st_mode)){
 					perror("The fid belongs to a file not a directory. Can't execute TCREATE\n");
@@ -297,7 +323,7 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 				exit(1);
 			}
 
-			uint32_t perm = T_p9_obj -> perm;
+			perm = T_p9_obj -> perm;
 			if((perm & 0x80000000) == 0x80000000){ //this is a directory
 
 				create_directory(fnode->path, T_p9_obj -> name);
@@ -310,7 +336,7 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			R_p9_obj -> type = P9_RCREATE;
 			R_p9_obj -> tag = T_p9_obj -> tag;
 			R_p9_obj -> qid = (qid_t *) malloc(sizeof(qid_t));
-			char *newpathname = (char *)malloc(1000);
+			newpathname = (char *)malloc(1000);
 			bzero(newpathname, 1000);
 			strcat(newpathname, fnode->path);
 			strcat(newpathname, "/");
@@ -326,7 +352,8 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			make_qid_from_UNIX_file(fnode->path, R_p9_obj -> qid);
 			R_p9_obj -> iounit = 0;
 			if(R_p9_obj -> qid -> type == 0 ){ //this is a regular file
-				int fd = -1;
+				int fd;
+				fd = -1;
 				switch(T_p9_obj -> mode){
 					case 0:
 						fd = open(fnode -> path, O_RDONLY);
@@ -349,11 +376,12 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 
 			break;
 			}//end scope
-		case P9_TREMOVE:
+		case P9_TREMOVE:{
+			int fid;
 			R_p9_obj -> size = 7;
 			R_p9_obj -> type = P9_RREMOVE;
 			R_p9_obj -> tag = T_p9_obj -> tag;
-			int fid = T_p9_obj -> fid;
+			fid = T_p9_obj -> fid;
 			fnode = fid_table_find_fid(fid_table, fid);
 			assert(fnode != NULL);
 			assert(fnode->path != NULL);
@@ -367,16 +395,21 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			}
 			assert(fid_table_find_fid(fid_table, T_p9_obj -> fid) == NULL);
 			break;
+			}//end scope
 		case P9_TWSTAT:
 		{
-			int fid = T_p9_obj -> fid;
-			stat_t *s_new = T_p9_obj -> stat;
-			fid_node *fnode = fid_table_find_fid(fid_table, fid);
+			int fid;
+			fid_node *fnode;
+			stat_t *s_new;
+			stat_t *s_old;
+			fid = T_p9_obj -> fid;
+			s_new = T_p9_obj -> stat;
+			fnode = fid_table_find_fid(fid_table, fid);
 			if(fnode == NULL){
 				perror("writing stat to non existing file\n");
 				exit(1);
 			}
-			stat_t *s_old = (stat_t *)malloc(sizeof(stat_t));
+			s_old = (stat_t *)malloc(sizeof(stat_t));
 			make_stat_from_UNIX_file(fnode->path, s_old);
 			/* now you have s_new and s_old. Check differences and call the appropriate UNIX api */
 			/* it doesn't make any sense to change the type, dev, qid, atime, mtime, muid */

@@ -15,6 +15,7 @@
 #include "fid.h"
 #include <stdint.h>
 
+#define DEBUG 1
 
 void error(char *msg)
 {
@@ -34,6 +35,7 @@ void init_9p_obj(p9_obj_t* obj){
 }
 
 void destroy_p9_obj(p9_obj_t *obj){
+        int i;
 	obj -> size = -1;
 	obj -> tag = -1;
 	obj -> msize = -1;
@@ -53,7 +55,7 @@ void destroy_p9_obj(p9_obj_t *obj){
 		free(obj -> aqid);
 		obj -> aqid = NULL;
 	}
-	for(int i = 0; i < obj->nwqid; i++){
+	for(i = 0; i < obj->nwqid; i++){
 		if(obj -> wqid[i]) free(obj -> wqid[i]);
 	}
 	obj -> nwqid = 0;
@@ -62,7 +64,7 @@ void destroy_p9_obj(p9_obj_t *obj){
 		obj -> wqid = NULL;
 	}
 
-	for(int i = 0; i < obj -> nwname; i++){
+	for(i = 0; i < obj -> nwname; i++){
 		if(obj -> wname_list[i].wname) free(obj -> wname_list[i].wname);
 	}
 	obj -> nwname = 0;
@@ -75,18 +77,22 @@ void destroy_p9_obj(p9_obj_t *obj){
 void thread_function(void *newsockfd_ptr){
 	uint8_t* buffer;
 	int n;
+#ifdef DEBUG
 	int i;
+#endif
 	int newsockfd;
+	uint8_t *Rbuffer;
+	p9_obj_t *T_p9_obj;
+	p9_obj_t *R_p9_obj;
+        p9_obj_t *test_p9_obj;
 	/* allocate the fid table */
 	/* should be persistent through out the connection */
-	fid_list **fid_table = fid_table_init();
+	fid_list **fid_table;
+	fid_table = fid_table_init();
 	/* end of fid_table allocation */
-    assert(fid_table[0] == NULL);
-    buffer = (uint8_t *)malloc(9000 * sizeof(char));
-   	p9_obj_t *T_p9_obj;
-	p9_obj_t *R_p9_obj;
-	p9_obj_t *test_p9_obj;
-	bzero(buffer, 256);
+        assert(fid_table[0] == NULL);
+        buffer = (uint8_t *)malloc(9000 * sizeof(char));
+   	bzero(buffer, 256);
 	T_p9_obj = (p9_obj_t *) malloc (sizeof(p9_obj_t));
 	R_p9_obj = (p9_obj_t *) malloc(sizeof(p9_obj_t));
 	test_p9_obj = (p9_obj_t *) malloc(sizeof(p9_obj_t));
@@ -96,11 +102,11 @@ void thread_function(void *newsockfd_ptr){
 	newsockfd = *(int *)newsockfd_ptr;
 	while((n = read(newsockfd, buffer, 9000))!=0){
 #ifdef DEBUG
-		for(int i = 0; i < n; i++){
-			printf(stderr, "%d ", buffer[i]);
+		for(i = 0; i < n; i++){
+			//printf(stderr, "%d ", buffer[i]);
 		}
 
-		fprintf(stderr, "\n");
+		//fprintf(stderr, "\n");
 #endif
 
 		/* decode the buffer and create the T object */
@@ -114,7 +120,7 @@ void thread_function(void *newsockfd_ptr){
 		/***************************/
 		/* ENCODE, PRINT, AND SEND */
 		/* encode the RMessage     */
-		uint8_t * Rbuffer = encode(R_p9_obj);
+		Rbuffer = encode(R_p9_obj);
 
 		/* Check that the message buffer represents the R object */
 #ifdef DEBUG
@@ -126,12 +132,15 @@ void thread_function(void *newsockfd_ptr){
 #endif
 		/* send the message buffer */
 #ifdef DEBUG
-		for(int i = 0; i < R_p9_obj -> size; i++){
-			fprintf(stderr, "%d ", Rbuffer[i]);
+		for(i = 0; i < R_p9_obj -> size; i++){
+			//fprintf(stderr, "%d ", Rbuffer[i]);
 		}
-		fprintf(stderr, "\n");
+		//fprintf(stderr, "\n");
 #endif
-		write(newsockfd, Rbuffer, R_p9_obj -> size);
+		if(write(newsockfd, Rbuffer, R_p9_obj -> size) == -1){
+			fprintf(stderr, "Error while writing to socket...\n");
+			exit(1);
+		}
 		/***************************/
 		destroy_p9_obj(T_p9_obj);
 		destroy_p9_obj(R_p9_obj);
@@ -142,7 +151,7 @@ void thread_function(void *newsockfd_ptr){
 
 int main(int argc, char *argv[])
 {
-	int sockfd, newsockfd, portno, clilen, n;
+	int sockfd, newsockfd, portno, clilen;
 	threadpool_t *pool;
 	struct sockaddr_in serv_addr, cli_addr;
 	if(argc < 2){
@@ -151,7 +160,7 @@ int main(int argc, char *argv[])
 	}
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if(sockfd < 0) {
-		perror("Error opening socket");
+		printf("Error opening socket\n");
 		exit(1);
 	}
 	bzero(&serv_addr, sizeof(serv_addr));
@@ -159,16 +168,18 @@ int main(int argc, char *argv[])
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_port = htons(portno);
 	serv_addr.sin_addr.s_addr = INADDR_ANY;
-	if(bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
-		error("ERROR on binding");
+	if(bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0){
+		printf("error in binding\n");
+		exit(1);
+	}
 	pool = threadpool_create(64, 1000, 0);
 	assert(pool!=NULL);
 	listen(sockfd, 5);
 	clilen = sizeof(cli_addr);
 	while(1){
-		newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+		newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, (socklen_t *) &clilen);
 		if(newsockfd < 0)
-			error("ERROR on accept");
+			exit(1);
 		threadpool_add(pool, &thread_function, (void *)&newsockfd, 0);
 	}
 	return 0;

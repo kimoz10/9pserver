@@ -45,6 +45,10 @@ void encode_qid(qid_t *qid, uint8_t *msg_buffer, int start_idx, int length){
 }
 
 void encode_stat(stat_t *stat, uint8_t* msg_buffer, int start_idx, int length){
+	int name_len;
+	int uid_len;
+	int gid_len;
+	int muid_len;
 	int_to_buffer_bytes(length, msg_buffer, start_idx, 2);
 	int_to_buffer_bytes(stat->type, msg_buffer, start_idx + 2, 2);
 	int_to_buffer_bytes(stat->dev, msg_buffer, start_idx + 4, 4);
@@ -53,23 +57,24 @@ void encode_stat(stat_t *stat, uint8_t* msg_buffer, int start_idx, int length){
 	int_to_buffer_bytes(stat->atime, msg_buffer, start_idx + 25, 4);
 	int_to_buffer_bytes(stat->mtime, msg_buffer, start_idx + 29, 4);
 	int_to_buffer_bytes(stat->length, msg_buffer, start_idx + 33, 8);
-	int name_len = strlen(stat->name);
+	name_len = strlen(stat->name);
 	int_to_buffer_bytes(name_len, msg_buffer, start_idx + 41, 2);
 	string_to_buffer_bytes(stat->name, msg_buffer, start_idx + 43, name_len);
-	int uid_len = strlen(stat->uid);
+	uid_len = strlen(stat->uid);
 	int_to_buffer_bytes(uid_len, msg_buffer, start_idx + name_len + 43, 2);
 	string_to_buffer_bytes(stat->uid, msg_buffer, start_idx + name_len + 45, uid_len);
-	int gid_len = strlen(stat->gid);
+	gid_len = strlen(stat->gid);
 	int_to_buffer_bytes(gid_len, msg_buffer, start_idx + name_len + uid_len + 45, 2);
 	string_to_buffer_bytes(stat->gid, msg_buffer, start_idx + name_len + uid_len + 47, gid_len);
-	int muid_len = strlen(stat->muid);
+	muid_len = strlen(stat->muid);
 	int_to_buffer_bytes(muid_len, msg_buffer, start_idx + name_len +uid_len + 47 + gid_len, 2);
 	string_to_buffer_bytes(stat->muid, msg_buffer, start_idx + name_len +uid_len + 49 + gid_len, muid_len);
 }
 
 qid_t *decode_qid(uint8_t *msg_buffer, int start_idx, int length){
 	/* length is always 13. Should take it away later */
-	qid_t *qid = (qid_t *) malloc(sizeof(qid_t));
+	qid_t *qid;
+	qid = (qid_t *) malloc(sizeof(qid_t));
 	qid -> type = msg_buffer[start_idx];
 	qid -> version = buffer_bytes_to_int(msg_buffer, start_idx + 1, 4);
 	qid -> path = buffer_bytes_to_int(msg_buffer, start_idx + 5, 8);
@@ -77,15 +82,19 @@ qid_t *decode_qid(uint8_t *msg_buffer, int start_idx, int length){
 }
 
 qid_t **decode_wqid(uint8_t *msg_buffer, int nwqid, int start_idx){
-	qid_t **wqid = (qid_t **)malloc(nwqid * sizeof(qid_t *));
-	for(int i = 0; i < nwqid; i++){
+	int i;
+	qid_t **wqid;
+	wqid = (qid_t **)malloc(nwqid * sizeof(qid_t *));
+	for(i = 0; i < nwqid; i++){
 		wqid[i] = decode_qid(msg_buffer, start_idx + 13 * i, 13);
 	}
 	return wqid;
 }
 
 stat_t *decode_stat(uint8_t *msg_buffer, int start_idx, int length){
-	stat_t *s = (stat_t *) malloc(sizeof(stat_t));
+	stat_t *s;
+	int name_len, uid_len, gid_len, muid_len;
+	s = (stat_t *) malloc(sizeof(stat_t));
 	buffer_bytes_to_int(msg_buffer, start_idx, 2);
 	//printf("stat_len %d\n", length);
 	//printf("size field %d\n", size);
@@ -96,17 +105,17 @@ stat_t *decode_stat(uint8_t *msg_buffer, int start_idx, int length){
 	s->atime = buffer_bytes_to_int(msg_buffer, start_idx + 25, 4);
 	s->mtime = buffer_bytes_to_int(msg_buffer, start_idx + 29, 4);
 	s->length = buffer_bytes_to_int(msg_buffer, start_idx + 33, 8);
-	int name_len = buffer_bytes_to_int(msg_buffer, start_idx + 41, 2);
+	name_len = buffer_bytes_to_int(msg_buffer, start_idx + 41, 2);
 	s->name = (char *) malloc(name_len * sizeof(char) + 1);
 	bzero(s->name, name_len + 1);
 	buffer_bytes_to_string(msg_buffer, start_idx+43, name_len, s->name);
-	int uid_len = buffer_bytes_to_int(msg_buffer, start_idx + name_len + 43, 2);
+	uid_len = buffer_bytes_to_int(msg_buffer, start_idx + name_len + 43, 2);
 	s->uid = (char *)malloc(uid_len + 1);
 	buffer_bytes_to_string(msg_buffer, start_idx + name_len + 45, uid_len, s->uid);
-	int gid_len = buffer_bytes_to_int(msg_buffer, start_idx + name_len + uid_len + 45, 2);
+	gid_len = buffer_bytes_to_int(msg_buffer, start_idx + name_len + uid_len + 45, 2);
 	s->gid = (char *) malloc(gid_len + 1);
 	buffer_bytes_to_string(msg_buffer, start_idx + name_len + uid_len + 47, gid_len, s-> gid);
-	int muid_len = buffer_bytes_to_int(msg_buffer, start_idx + name_len + uid_len + gid_len + 47, 2);
+	muid_len = buffer_bytes_to_int(msg_buffer, start_idx + name_len + uid_len + gid_len + 47, 2);
 	s->muid = (char *) malloc(muid_len + 1);
 	buffer_bytes_to_string(msg_buffer, start_idx + name_len + uid_len + gid_len + 49, muid_len, s -> muid);
 	return s;
@@ -131,9 +140,13 @@ int compare_9p_obj(p9_obj_t *p1, p9_obj_t *p2){
 
 	/* neglecting TFLUSH and RFLUSH for now */
 	if(p1 -> type == P9_RSTAT){
+		stat_t *s1;
+		stat_t *s2;
+		qid_t *q1;
+		qid_t *q2;
 		assert(p1->stat_len == p2->stat_len);
-		stat_t *s1 = p1->stat;
-		stat_t *s2 = p2->stat;
+		s1 = p1->stat;
+		s2 = p2->stat;
 		assert(s1->atime == s2->atime);
 		assert(s1->dev == s2->dev);
 		assert(strcmp(s1->gid, s2->gid) == 0);
@@ -144,32 +157,38 @@ int compare_9p_obj(p9_obj_t *p1, p9_obj_t *p2){
 		assert(strcmp(s1->muid, s2->muid) == 0);
 		assert(strcmp(s1->name, s2->name) == 0);
 		assert(s1->type == s2->type);
-		qid_t *q1 = s1->qid;
-		qid_t *q2 = s2->qid;
+		q1 = s1->qid;
+		q2 = s2->qid;
 		assert(q1->path == q2->path);
 		assert(q1->version == q2->version);
 		assert(q1->type == q2->type);
 	}
 
 	if(p1 -> type == P9_RREAD){
+		int i;
 		assert(p1->count == p2->count);
-		for(int i = 0; i < p1->count; i++){
+		for(i = 0; i < p1->count; i++){
 			assert(p1->data[i] == p2->data[i]);
 		}
 	}
 	if(p1->type == P9_ROPEN){
-		qid_t *q1 = p1->qid;
-		qid_t *q2 = p2->qid;
+		qid_t *q1;
+		qid_t *q2;
+		q1 = p1->qid;
+		q2 = p2->qid;
 		assert(q1->path == q2->path);
 		assert(q1->version == q2->version);
 		assert(q1->type == q2->type);
 		assert(p1->iounit == p2->iounit);
 	}
 	if(p1->type == P9_RWALK){
+		int i;
 		assert(p1->nwqid == p2->nwqid);
-		for(int i = 0; i < p1->nwqid; i++){
-			qid_t *q1 = p1->wqid[i];
-			qid_t *q2 = p2->wqid[i];
+		for(i = 0; i < p1->nwqid; i++){
+			qid_t *q1;
+			qid_t *q2;
+			q1 = p1->wqid[i];
+			q2 = p2->wqid[i];
 			assert(q1->path == q2->path);
 			assert(q1->version == q2->version);
 			assert(q1->type == q2->type);
@@ -235,19 +254,22 @@ void decode(uint8_t* msg_buffer, p9_obj_t *p9_obj){
 		case P9_TFLUSH:
 			p9_obj -> oldtag = (uint16_t) buffer_bytes_to_int(msg_buffer, 7, 2);
 			break;
-		case P9_TWALK:
+		case P9_TWALK:{
+			int buffer_index;
+			int i, wname_len;
+			buffer_index = 17;
 			p9_obj -> fid = (uint32_t) buffer_bytes_to_int(msg_buffer, 7, 4);
 			p9_obj -> newfid = (uint32_t) buffer_bytes_to_int(msg_buffer, 11, 4);
 			p9_obj -> nwname = (uint16_t) buffer_bytes_to_int(msg_buffer, 15, 2);
 			p9_obj -> wname_list = (wname_node *) malloc (sizeof(wname_node) * p9_obj -> nwname);
-			int buffer_index = 17;
-			for(int i = 0; i < p9_obj -> nwname; i++){
-				int wname_len = buffer_bytes_to_int(msg_buffer, buffer_index, 2);
+			for(i = 0; i < p9_obj -> nwname; i++){
+				wname_len = buffer_bytes_to_int(msg_buffer, buffer_index, 2);
 				((p9_obj -> wname_list) + i) -> wname  = (char *)malloc(wname_len * sizeof(char) + 1);
 				buffer_bytes_to_string(msg_buffer, buffer_index + 2, wname_len, ((p9_obj -> wname_list) + i)->wname);
 				buffer_index += (2 + wname_len);
 			}
 			break;
+			}//end scope
 		case P9_RWALK:
 			p9_obj -> nwqid = buffer_bytes_to_int(msg_buffer, 7, 2);
 			p9_obj -> wqid = decode_wqid(msg_buffer, p9_obj -> nwqid, 9); //returns a pointer to a pointer to qid
@@ -336,6 +358,7 @@ unsigned long long get_stat_length(stat_t *stat){
 
 uint8_t *encode(p9_obj_t *p9_obj){
 	uint8_t *msg_buffer;
+	int i;
 	msg_buffer = (uint8_t *) malloc(p9_obj -> size);
 	int_to_buffer_bytes(p9_obj -> size, msg_buffer, 0, 4);
 	msg_buffer[4] = p9_obj -> type;
@@ -362,9 +385,10 @@ uint8_t *encode(p9_obj_t *p9_obj){
 			break;
 		case P9_RWALK:
 			int_to_buffer_bytes(p9_obj -> nwqid, msg_buffer, 7, 2);
-			for(int i = 0; i < p9_obj -> nwqid; i++){
+			for(i = 0; i < p9_obj -> nwqid; i++){
+				qid_t *qid;
 				assert(p9_obj -> wqid[i] != NULL);
-				qid_t *qid = p9_obj -> wqid[i];
+				qid = p9_obj -> wqid[i];
 				assert(qid != NULL);
 				encode_qid(qid, msg_buffer, 9 + 13*i, 13);
 			}
@@ -427,6 +451,7 @@ void print_stat(stat_t *s){
 /* useful for debugging									  */
 
 void print_p9_obj(p9_obj_t *p9_obj){
+	int i;
 	printf("**************************************************\n");
 	printf("size: %u\n", p9_obj -> size);
 	printf("message type: %u\n", p9_obj -> type);
@@ -477,7 +502,7 @@ void print_p9_obj(p9_obj_t *p9_obj){
 			printf("fid: %u\n", p9_obj -> fid);
 			printf("newfid: %u\n", p9_obj -> newfid);
 			printf("nwname: %u\n", p9_obj -> nwname);
-			for(int i = 0; i < p9_obj -> nwname; i++){
+			for(i = 0; i < p9_obj -> nwname; i++){
 				printf("wname: %s\n", (p9_obj->wname_list +i)->wname);
 			}
 			break;

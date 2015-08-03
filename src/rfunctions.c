@@ -21,7 +21,8 @@
 #include <strings.h>
 
 int permissions(struct stat *st){
-	int permissions = 0;
+	int permissions;
+	permissions = 0;
 	if(st->st_mode & S_IRUSR) permissions|=0b100000000;
 	if(st->st_mode & S_IWUSR) permissions|=0b010000000;
 	if(st->st_mode & S_IXUSR) permissions|=0b001000000;
@@ -35,7 +36,7 @@ int permissions(struct stat *st){
 }
 void UNIX_stat_to_qid(struct stat *st, qid_t *qid){
 	qid->path = st->st_ino;
-	qid->version = (st->st_mtime ^ (st->st_size << 8)) & 0; /* may be this will need to reflect any modifications to the file */
+	qid->version = (st->st_mtime ^ (st->st_size << 8)) & 0; /* may be this will need to reflect any modifications to the file. zero for now */
 	qid->type = 0;
 	if (S_ISDIR(st->st_mode)) qid->type |= QTDIR;
 	if (S_ISLNK(st->st_mode)) qid->type |= QTSYMLINK;
@@ -56,7 +57,7 @@ void UNIX_stat_to_stat(char* filename, struct stat *st, stat_t *s){
 	/* dont forget to assign muid */
 	s -> muid = "";
 	/* setting up the mode for the stat */
-	s->mode = ((((uint32_t) s->qid->type) << 24) | permissions(st)) & 0x80ffffff;
+	s->mode = ((((uint32_t) s->qid->type) << 24) | permissions(st));// & 0x80ffffff;
 	/* allowing all permissions for now since eventually it is going to run internally in ESX which can be considered relatively trusted
 	 * but this had to change later */
 }
@@ -70,9 +71,9 @@ void make_qid_from_UNIX_file(const char *pathname, qid_t *qid){
 
 void make_stat_from_UNIX_file(char *pathname, stat_t *s){
 	struct stat *st;
+	char *filename;
 	st  = (struct stat *) malloc(sizeof(struct stat));
 	lstat(pathname, st);
-	char* filename;
 	filename = strrchr(pathname, '/');
 	if(filename) filename = filename + 1;
 	else filename = pathname;
@@ -84,7 +85,8 @@ int is_file_exists(char *newpathname){
 }
 
 void create_directory(char *pathname, char* filename){
-	char *s = (char *)malloc(1000 * sizeof(char));
+	char *s;
+	s = (char *)malloc(1000 * sizeof(char));
 	bzero(s, 1000);
 	strcat(s, pathname);
 	strcat(s, "/");
@@ -101,18 +103,21 @@ void create_directory(char *pathname, char* filename){
 }
 
 void create_file(char *pathname, char* filename, int perm){
-	char *s = (char *)malloc(1000 * sizeof(char));
+	char *s;
+	int f;
+	s = (char *)malloc(1000 * sizeof(char));
 	bzero(s, 1000);
 	strcat(s, pathname);
 	strcat(s, "/");
 	strcat(s,filename);
-	int f = open(s, O_CREAT|O_RDWR, perm);
+	f = open(s, O_CREAT|O_RDWR, perm);
 	close(f);
 	free(s);
 }
 
 void UNIX_rename_directory(char *path, char *new_name){
-	char *new_path = (char *) malloc(1000 * sizeof(char));
+	char *new_path;
+	new_path = (char *) malloc(1000 * sizeof(char));
 	bzero(new_path, 1000);
 	strcat(new_path, path);
 	strcat(new_path, "../");
@@ -122,9 +127,12 @@ void UNIX_rename_directory(char *path, char *new_name){
 }
 
 void UNIX_rename_file(char *path, char *new_name){
-	char *last = strrchr(path, '/');
-	int len = (int)(last - path + 1);
-	char *new_path = (char *) malloc(1000 * sizeof(char));
+	char *last;
+	char *new_path;
+	int len;
+	last = strrchr(path, '/');
+	len = (int)(last - path + 1);
+	new_path = (char *) malloc(1000 * sizeof(char));
 	bzero(new_path, 1000);
 	strncat(new_path, path, len);
 	strcat(new_path, new_name);
@@ -147,8 +155,9 @@ int UNIX_read(int fd, uint8_t *data, unsigned long long offset, int count){
 
 
 int UNIX_write(int fd, unsigned long long offset, uint8_t *data, int count){
+	int n;
 	lseek(fd, offset, SEEK_SET);
-	int n = write(fd, data, count);
+	n = write(fd, data, count);
 	return n;
 }
 
