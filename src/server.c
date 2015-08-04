@@ -15,7 +15,7 @@
 #include "fid.h"
 #include <stdint.h>
 
-#define DEBUG 1
+//#define DEBUG 1
 
 void error(char *msg)
 {
@@ -35,16 +35,31 @@ void init_9p_obj(p9_obj_t* obj){
 }
 
 void destroy_p9_obj(p9_obj_t *obj){
-        int i;
+    int i;
 	obj -> size = -1;
 	obj -> tag = -1;
 	obj -> msize = -1;
+	if(obj -> version != NULL){
+		free(obj -> version);
+		obj -> version = NULL;
+	}
+
+	if(obj -> type == P9_TATTACH){
+		free (obj -> aname);
+		obj -> aname = NULL;
+	}
+
+	if(obj -> type == P9_TATTACH){
+		free (obj -> uname);
+		obj -> uname = NULL;
+	}
+
 	if(obj -> data) {
 		free(obj -> data);
 		obj -> data = NULL;
 	}
 	if(obj -> stat){
-		free(obj -> stat);
+		destroy_stat(obj -> stat);
 		obj -> stat = NULL;
 	}
 	if(obj -> qid) {
@@ -90,8 +105,9 @@ void thread_function(void *newsockfd_ptr){
 	fid_list **fid_table;
 	fid_table = fid_table_init();
 	/* end of fid_table allocation */
-        assert(fid_table[0] == NULL);
-        buffer = (uint8_t *)malloc(9000 * sizeof(char));
+    assert(fid_table[0] == NULL);
+    /* TODO: put a reasonable buffer size */
+    buffer = (uint8_t *)malloc(9000 * sizeof(char));
    	bzero(buffer, 256);
 	T_p9_obj = (p9_obj_t *) malloc (sizeof(p9_obj_t));
 	R_p9_obj = (p9_obj_t *) malloc(sizeof(p9_obj_t));
@@ -147,6 +163,12 @@ void thread_function(void *newsockfd_ptr){
 		destroy_p9_obj(test_p9_obj);
 		free(Rbuffer);
 	}
+	fid_table_destroy(fid_table);
+	free(buffer);
+	free(T_p9_obj);
+	free(R_p9_obj);
+	free(test_p9_obj);
+	close(newsockfd);
 }
 
 int main(int argc, char *argv[])
@@ -172,16 +194,24 @@ int main(int argc, char *argv[])
 		printf("error in binding\n");
 		exit(1);
 	}
-	pool = threadpool_create(64, 1000, 0);
+	pool = threadpool_create(64, 64, 0);
 	assert(pool!=NULL);
 	listen(sockfd, 5);
 	clilen = sizeof(cli_addr);
 	while(1){
+		int err;
+		fprintf(stderr, "Server is now accepting new connections...\n");
 		newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, (socklen_t *) &clilen);
 		if(newsockfd < 0)
 			exit(1);
-		threadpool_add(pool, &thread_function, (void *)&newsockfd, 0);
+		if((err = threadpool_add(pool, &thread_function, (void *)&newsockfd, 0)) != 0){
+			printf("Error %d while adding job to the job queue\n", err);
+			exit(1);
+		}
+
+		fprintf(stderr, "returned from thread function\n");
 	}
+	close(sockfd);
 	return 0;
 }
 

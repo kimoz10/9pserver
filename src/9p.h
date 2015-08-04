@@ -146,6 +146,7 @@ qid_t *decode_qid(uint8_t *msg_buffer, int start_idx, int length);
 qid_t **decode_wqid(uint8_t *msg_buffer, int nwqid, int start_idx);
 stat_t *decode_stat(uint8_t *msg_buffer, int start_idx, int length);
 
+void destroy_stat(stat_t *s);
 int compare_9p_obj(p9_obj_t *p1, p9_obj_t *p2);
 
 /* create a message buffer based on p9 object to be transported on wire */

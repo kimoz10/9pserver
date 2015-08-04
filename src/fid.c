@@ -11,13 +11,28 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <sys/types.h>
-
+#include <string.h>
 struct fid_list *create_fid_list(){
 	fid_list *flist;
 	flist = (fid_list *) malloc(sizeof(fid_list));
 	flist -> head = NULL;
 	flist -> tail = NULL;
 	return flist;
+}
+
+void fid_list_destroy(fid_list *flist){
+    fid_node *current;
+	current = flist -> head;
+	//printf("destroying list\n");
+	while(current != NULL){
+		fid_node *temp;
+		temp = current;
+		current = current -> next;
+		//printf("destroying node\n");
+		free(temp -> path);
+		free(temp);
+	}
+	free(flist);
 }
 
 void add_fid_node(struct fid_list *flist, uint32_t fid, char *path){
@@ -45,6 +60,10 @@ int remove_fid_from_list(struct fid_list *flist, uint32_t fid){
 		temp = flist -> head;
 		flist -> head = flist -> head -> next;
 		if(flist -> head == NULL) flist -> tail = NULL;
+		if(temp -> path != NULL){
+			free(temp -> path);
+			temp -> path = NULL;
+		}
 		free(temp);
 		return 0;
 	}
@@ -53,6 +72,7 @@ int remove_fid_from_list(struct fid_list *flist, uint32_t fid){
 	while(current != NULL){
 		if(current -> fid == fid){
 			prev -> next = current -> next;
+			free(current -> path);
 			free(current);
 			return 0;
 		}
@@ -76,7 +96,8 @@ fid_node *create_fid_node(uint32_t fid, char* path){
 	fid_node *fnode;
 	fnode = (fid_node *) malloc (sizeof(fid_node));
 	fnode -> fid = fid;
-	fnode -> path = path;
+	fnode -> path = (char *) malloc(1000);
+	strncpy(fnode->path, path, 999);
 	fnode -> fd = -1;
 	fnode -> dd = 0;
 	fnode -> next = NULL;
@@ -94,6 +115,18 @@ fid_list **fid_table_init(){
 		fid_table[i] = NULL;
 	}
 	return fid_table;
+}
+
+void fid_table_destroy(fid_list **fid_table){
+	int i;
+	for(i = 0; i < HTABLE_SIZE; i++){
+		if(fid_table[i] != NULL){
+			//printf("destroying fid table... \n");
+			fid_list_destroy(fid_table[i]);
+		}
+	}
+	free(fid_table);
+	fid_table = NULL;
 }
 
 void fid_table_add_fid(fid_list **fid_table, uint32_t fid, char* path){
@@ -134,7 +167,7 @@ int fid_table_remove_fid(fid_list **fid_table, uint32_t fid){
 	if(fid_table[entry] == NULL) return -1;
 	fnode = find_fid_node_in_list(fid_table[entry], fid);
 	if(fnode == NULL) return -1;
-	if(stat(fnode -> path, &s) == 0){
+	if(lstat(fnode -> path, &s) == 0){
 		if (S_ISDIR(s.st_mode)){
 			if(fnode -> dd != 0){
 				closedir(fnode -> dd);

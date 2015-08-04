@@ -28,7 +28,8 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			R_p9_obj -> tag = T_p9_obj -> tag;
 			R_p9_obj -> msize = T_p9_obj -> msize;
 			R_p9_obj -> version_len = 6;
-			R_p9_obj -> version = "9P2000";
+			R_p9_obj -> version = (char *) malloc(20 * sizeof(char));;
+			strcpy(R_p9_obj -> version, "9P2000");
 			break;
 		case P9_TATTACH:
 			R_p9_obj -> size = 20; /* this is the size of the RMessage */
@@ -113,6 +114,7 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 						R_p9_obj -> ename_len = error_len;
 						R_p9_obj -> ename = error_msg;
 						R_p9_obj -> tag = T_p9_obj -> tag;
+						free(path);
 					}
 						/* The first element is walkabale. RWALK will return	*/
 					else{
@@ -142,11 +144,12 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 							if(fnode != NULL){
 								//fid = newfid case
 								fnode -> fid = T_p9_obj -> newfid;
-								fnode -> path = path;
+								strncpy(fnode -> path, path, 999);
 							}
 							else
 								fid_table_add_fid(fid_table, T_p9_obj -> newfid, path);
 						}
+						free(path);
 					}
 				}
 			}
@@ -248,10 +251,12 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 					make_stat_from_UNIX_file(newpathname, s);
 					encode_stat(s, data, idx, get_stat_length(s));
 					idx += (2 + get_stat_length(s));
-					free(s);
+
+					destroy_stat(s);
 					/* just a quick hack */
 					if(idx > (T_p9_obj->count - 500)) break; //this is a safety factor to make sure we are not exceeding the Tcount
 				}
+				free(newpathname);
 				R_p9_obj -> count = idx;
 				R_p9_obj -> data  = data;
 				R_p9_obj -> size = 4 + 2 + 4 + 1  + R_p9_obj -> count;
@@ -313,7 +318,7 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 				exit(1);
 			}
 			s = (struct stat *)malloc(sizeof(struct stat));
-			if(stat(fnode -> path, s)==0){
+			if(lstat(fnode -> path, s)==0){
 				if(!S_ISDIR(s->st_mode)){
 					perror("The fid belongs to a file not a directory. Can't execute TCREATE\n");
 				}
@@ -442,6 +447,7 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			R_p9_obj -> type = P9_RWSTAT;
 			R_p9_obj -> tag = T_p9_obj -> tag;
 			/* also gid can be changed but that should be taken care of later */
+			destroy_stat(s_old);
 			break;
 		}//end of scope
 		default:

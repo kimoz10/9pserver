@@ -44,7 +44,8 @@ void UNIX_stat_to_qid(struct stat *st, qid_t *qid){
 
 void UNIX_stat_to_stat(char* filename, struct stat *st, stat_t *s){
 	assert(st != NULL);
-	s->name = filename;
+	s->name = (char *) malloc(50);
+	s->name = strncpy(s->name, filename, 49);
 	s->atime = st->st_atime;
 	s->mtime = st->st_mtime;
 	s->length = st->st_size;
@@ -52,8 +53,10 @@ void UNIX_stat_to_stat(char* filename, struct stat *st, stat_t *s){
 	s->dev = 0;
 	s->qid = (qid_t *) malloc(sizeof(qid_t));
 	UNIX_stat_to_qid(st, s->qid);
-	s->uid = (getpwuid(st->st_uid))->pw_name;
-	s->gid = (getgrgid(st->st_gid))->gr_name;
+	s -> uid = (char *) malloc(50);
+	s -> gid = (char *) malloc(50);
+	strncpy(s->uid, (getpwuid(st->st_uid))->pw_name, 49);
+	strncpy(s->gid, (getgrgid(st->st_gid))->gr_name, 49);
 	/* dont forget to assign muid */
 	s -> muid = "";
 	/* setting up the mode for the stat */
@@ -67,6 +70,8 @@ void make_qid_from_UNIX_file(const char *pathname, qid_t *qid){
 	st = (struct stat *) malloc(sizeof(struct stat));
 	lstat(pathname, st);
 	UNIX_stat_to_qid(st, qid);
+	/* NEW */
+	free(st);
 }
 
 void make_stat_from_UNIX_file(char *pathname, stat_t *s){
@@ -78,6 +83,8 @@ void make_stat_from_UNIX_file(char *pathname, stat_t *s){
 	if(filename) filename = filename + 1;
 	else filename = pathname;
 	UNIX_stat_to_stat(filename, st, s);
+	/* NEW */
+	free(st);
 }
 
 int is_file_exists(char *newpathname){
@@ -95,6 +102,7 @@ void create_directory(char *pathname, char* filename){
 	printf("trying to create directory %s\n", s);
 #endif
 	errno = 0;
+	/* TODO: ADD appropriate permissions */
 	if(mkdir(s, 0755)!=0){
 		printf("error number %d\n", errno);
 		exit(1);

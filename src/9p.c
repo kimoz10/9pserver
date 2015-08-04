@@ -121,6 +121,26 @@ stat_t *decode_stat(uint8_t *msg_buffer, int start_idx, int length){
 	return s;
 }
 
+void destroy_stat(stat_t *s){
+	if(s -> qid != NULL){
+		free(s -> qid);
+		s -> qid = NULL;
+	}
+	if(s -> gid != NULL){
+		free(s -> gid);
+		s -> gid = NULL;
+	}
+	if(s -> uid != NULL){
+		free(s -> uid);
+		s -> uid = NULL;
+	}
+	if(s -> name != NULL){
+		free(s -> name);
+		s->name = NULL;
+	}
+	free(s);
+}
+
 int compare_9p_obj(p9_obj_t *p1, p9_obj_t *p2){
 	assert(p1->size == p2->size);
 	assert(p1->tag == p2 -> tag);

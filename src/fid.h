@@ -31,6 +31,8 @@ struct fid_list{
 typedef struct fid_node fid_node;
 typedef struct fid_list fid_list;
 
+void fid_table_destroy(fid_list **);
+void fid_list_destroy(fid_list *);
 /* define fid_list functions */
 struct fid_list *create_fid_list();
 void add_fid_node(struct fid_list *flist, uint32_t fid, char *path);
