@@ -14,8 +14,8 @@
 #include "rmessage.h"
 #include "fid.h"
 #include <stdint.h>
+//#include <objLib.h>
 
-//#define DEBUG 1
 
 void error(char *msg)
 {
@@ -24,14 +24,7 @@ void error(char *msg)
 }
 
 void init_9p_obj(p9_obj_t* obj){
-	obj -> size = -1;
-	obj -> tag = -1;
-	obj -> data = NULL;
-	obj -> qid = NULL;
-	obj -> aqid = NULL;
-	obj -> stat = NULL;
-	obj -> wqid = NULL;
-	obj -> wname_list = NULL;
+	bzero(obj, sizeof(p9_obj_t));
 }
 
 void destroy_p9_obj(p9_obj_t *obj){
@@ -78,23 +71,35 @@ void destroy_p9_obj(p9_obj_t *obj){
 		free(obj -> wqid);
 		obj -> wqid = NULL;
 	}
-
-	for(i = 0; i < obj -> nwname; i++){
-		if(obj -> wname_list[i].wname) free(obj -> wname_list[i].wname);
+        if(obj -> wname_list != NULL){
+		for(i = 0; i < obj -> nwname; i++){
+			if(obj -> wname_list[i].wname) free(obj -> wname_list[i].wname);
+		}
+        	free(obj -> wname_list);
+        	obj -> wname_list = NULL;
 	}
 	obj -> nwname = 0;
+
 	if(obj -> wname_list) {
 		free(obj -> wname_list);
 		obj -> wname_list = NULL;
 	}
+	
+	if(obj -> ename){
+		free(obj -> ename);
+		obj -> ename = NULL;
+	}
+	obj -> ename_len = 0;
 }
 
 void thread_function(void *newsockfd_ptr){
+	int fid_count;
 	uint8_t* buffer;
 	int n;
 #ifdef DEBUG
 	int i;
 #endif
+	int attach_flag;
 	int newsockfd;
 	uint8_t *Rbuffer;
 	p9_obj_t *T_p9_obj;
@@ -105,9 +110,9 @@ void thread_function(void *newsockfd_ptr){
 	fid_list **fid_table;
 	fid_table = fid_table_init();
 	/* end of fid_table allocation */
-    assert(fid_table[0] == NULL);
-    /* TODO: put a reasonable buffer size */
-    buffer = (uint8_t *)malloc(9000 * sizeof(char));
+        assert(fid_table[0] == NULL);
+        /* TODO: put a reasonable buffer size */
+        buffer = (uint8_t *)malloc(9000 * sizeof(char));
    	bzero(buffer, 256);
 	T_p9_obj = (p9_obj_t *) malloc (sizeof(p9_obj_t));
 	R_p9_obj = (p9_obj_t *) malloc(sizeof(p9_obj_t));
@@ -116,13 +121,28 @@ void thread_function(void *newsockfd_ptr){
 	init_9p_obj(R_p9_obj);
 	init_9p_obj(test_p9_obj);
 	newsockfd = *(int *)newsockfd_ptr;
-	while((n = read(newsockfd, buffer, 9000))!=0){
+	fid_count = 0;
+	attach_flag = 0;
+	while(1){
+	        int size;
+		int read_bytes;
+		size = 0;
+		n = read(newsockfd, buffer, 4);
+		assert(n==4);
+                size = buffer_bytes_to_int(buffer, 0, 4);
+		assert(size!=0);
+		read_bytes = 0;
+		while(read_bytes < (size - 4)){
+			n = read(newsockfd, buffer + 4 + read_bytes, size - 4 - read_bytes);
+			read_bytes += n;
+		}
+		assert(read_bytes == (size - 4));
 #ifdef DEBUG
 		for(i = 0; i < n; i++){
-			//printf(stderr, "%d ", buffer[i]);
+			fprintf(stderr, "%d ", buffer[i]);
 		}
 
-		//fprintf(stderr, "\n");
+		fprintf(stderr, "\n");
 #endif
 
 		/* decode the buffer and create the T object */
@@ -131,6 +151,7 @@ void thread_function(void *newsockfd_ptr){
 #ifdef DEBUG
 		print_p9_obj(T_p9_obj);
 #endif
+		
 		/* prepare the RMessage */
 		prepare_reply(T_p9_obj, R_p9_obj, fid_table);
 		/***************************/
@@ -149,19 +170,28 @@ void thread_function(void *newsockfd_ptr){
 		/* send the message buffer */
 #ifdef DEBUG
 		for(i = 0; i < R_p9_obj -> size; i++){
-			//fprintf(stderr, "%d ", Rbuffer[i]);
+			fprintf(stderr, "%d ", Rbuffer[i]);
 		}
-		//fprintf(stderr, "\n");
+		fprintf(stderr, "\n");
 #endif
-		if(write(newsockfd, Rbuffer, R_p9_obj -> size) == -1){
+		if((n = write(newsockfd, Rbuffer, R_p9_obj -> size)) == -1){
 			fprintf(stderr, "Error while writing to socket...\n");
 			exit(1);
 		}
+		assert(n == R_p9_obj -> size);
 		/***************************/
+		if(T_p9_obj -> type == P9_TATTACH) attach_flag = 1;
+		fid_count = get_fid_count(fid_table);
+		printf("fid_count_is %d\n", fid_count);
 		destroy_p9_obj(T_p9_obj);
 		destroy_p9_obj(R_p9_obj);
 		destroy_p9_obj(test_p9_obj);
 		free(Rbuffer);
+		printf("attach flag is %d\n", attach_flag);
+		if((attach_flag == 1) && (fid_count ==0)){
+			printf("Connection is closing \n");
+			break;
+		}
 	}
 	fid_table_destroy(fid_table);
 	free(buffer);
@@ -180,6 +210,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "ERROR, no port provided\n");
 		exit(1);
 	}
+	//ObjLib_Init();
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if(sockfd < 0) {
 		printf("Error opening socket\n");
@@ -194,13 +225,13 @@ int main(int argc, char *argv[])
 		printf("error in binding\n");
 		exit(1);
 	}
-	pool = threadpool_create(64, 64, 0);
+	pool = threadpool_create(2, 10, 0);
 	assert(pool!=NULL);
 	listen(sockfd, 5);
 	clilen = sizeof(cli_addr);
 	while(1){
 		int err;
-		fprintf(stderr, "Server is now accepting new connections...\n");
+		//fprintf(stderr, "Server is now accepting new connections...\n");
 		newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, (socklen_t *) &clilen);
 		if(newsockfd < 0)
 			exit(1);
@@ -209,8 +240,9 @@ int main(int argc, char *argv[])
 			exit(1);
 		}
 
-		fprintf(stderr, "returned from thread function\n");
+		//fprintf(stderr, "returned from thread function\n");
 	}
+	//ObjLib_Exit();
 	close(sockfd);
 	return 0;
 }

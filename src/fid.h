@@ -45,5 +45,6 @@ fid_list **fid_table_init();
 void fid_table_add_fid(struct fid_list **fid_table, uint32_t fid, char* path);
 struct fid_node *fid_table_find_fid(struct fid_list **fid_table, uint32_t fid);
 int fid_table_remove_fid(struct fid_list **fid_table, uint32_t fid);
+int get_fid_count(fid_list **fid_table);
 
 #endif /* SRC_FID_H_ */

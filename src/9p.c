@@ -116,8 +116,10 @@ stat_t *decode_stat(uint8_t *msg_buffer, int start_idx, int length){
 	s->gid = (char *) malloc(gid_len + 1);
 	buffer_bytes_to_string(msg_buffer, start_idx + name_len + uid_len + 47, gid_len, s-> gid);
 	muid_len = buffer_bytes_to_int(msg_buffer, start_idx + name_len + uid_len + gid_len + 47, 2);
-	s->muid = (char *) malloc(muid_len + 1);
-	buffer_bytes_to_string(msg_buffer, start_idx + name_len + uid_len + gid_len + 49, muid_len, s -> muid);
+	if(muid_len != 0){
+		s->muid = (char *) malloc(muid_len + 1);
+		buffer_bytes_to_string(msg_buffer, start_idx + name_len + uid_len + gid_len + 49, muid_len, s -> muid);
+	}
 	return s;
 }
 
@@ -174,7 +176,6 @@ int compare_9p_obj(p9_obj_t *p1, p9_obj_t *p2){
 		assert(s1->mode == s2->mode);
 		assert(s1->mtime == s1->mtime);
 		assert(strcmp(s1->uid, s2->uid) == 0);
-		assert(strcmp(s1->muid, s2->muid) == 0);
 		assert(strcmp(s1->name, s2->name) == 0);
 		assert(s1->type == s2->type);
 		q1 = s1->qid;

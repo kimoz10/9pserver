@@ -18,6 +18,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <errno.h>
 
 void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table){
 	fid_node *fnode;
@@ -100,7 +101,8 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 					for(i = 0; i < T_p9_obj -> nwname; i++){
 						strcat(path, "/");
 						strcat(path, (T_p9_obj -> wname_list + i) -> wname);
-						if(is_file_exists(path) != -1) nwqid++;
+						//fprintf(stderr, "directory path is %s\n", path);
+						if(is_file_exists(path)) nwqid++;
 					}
 
 					if(nwqid == 0){
@@ -112,7 +114,9 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 						error_len = strlen(error_msg);
 						R_p9_obj -> size = 7 + 2 + error_len;
 						R_p9_obj -> ename_len = error_len;
-						R_p9_obj -> ename = error_msg;
+						R_p9_obj -> ename = (char *) malloc(error_len * sizeof(char) + 1);
+						bzero(R_p9_obj -> ename, error_len + 1);
+						strcpy(R_p9_obj -> ename, error_msg);
 						R_p9_obj -> tag = T_p9_obj -> tag;
 						free(path);
 					}
@@ -158,12 +162,24 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			/* Should remove the fid from the fid directory */
 			/* the remove fid should close any file or directory opened by this fid */
 			if(fid_table_remove_fid(fid_table, T_p9_obj -> fid) == -1){
+				int error_len;
+				char *error_msg;
 				perror("TCLUNK received for an fid that does not exist\n ");
+				error_msg = strerror(EBADF);
+                                error_len = strlen(error_msg);
+                                R_p9_obj -> size = 7 + 2 + error_len;
+                                R_p9_obj -> ename_len = error_len;
+				R_p9_obj -> ename = (char *) malloc(error_len + 1);
+				bzero(R_p9_obj -> ename, error_len + 1);
+                                strcpy(R_p9_obj -> ename , error_msg);
+                                R_p9_obj -> tag = T_p9_obj -> tag;
 			}
-			assert(fid_table_find_fid(fid_table, T_p9_obj -> fid) == NULL);
-			R_p9_obj -> tag = T_p9_obj -> tag;
-			R_p9_obj -> type = P9_RCLUNK;
-			R_p9_obj -> size = 7;
+			else{
+				assert(fid_table_find_fid(fid_table, T_p9_obj -> fid) == NULL);
+				R_p9_obj -> tag = T_p9_obj -> tag;
+				R_p9_obj -> type = P9_RCLUNK;
+				R_p9_obj -> size = 7;
+			}
 			break;
 		case P9_TOPEN:
 			fnode = fid_table_find_fid(fid_table, T_p9_obj -> fid);
@@ -191,6 +207,7 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 #ifdef DEBUG
 					printf("opening file %s for read only\n", fnode -> path);
 #endif
+					
 					fd = open(fnode -> path, O_RDONLY);
 					break;
 				case 1:
@@ -212,10 +229,22 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 				}
 
 				fnode -> fd = fd;
-				assert(fnode -> fd != -1);
+				if(fnode -> fd == -1){
+					R_p9_obj -> type =  P9_RERROR;
+                                        R_p9_obj -> ename = strerror(errno);
+                                        R_p9_obj -> ename_len = strlen(R_p9_obj -> ename);
+                                        R_p9_obj -> size = 4 + 1 + 2 + 2 + R_p9_obj -> ename_len;
+				}
+				else assert(fnode -> fd != -1);
 			}
 			else{ //file is a directory
 				fnode -> dd = opendir(fnode -> path);
+				if(fnode -> dd == NULL){
+					R_p9_obj -> type =  P9_RERROR;
+					R_p9_obj -> ename = strerror(errno);
+				        R_p9_obj -> ename_len = strlen(R_p9_obj -> ename);
+					R_p9_obj -> size = 4 + 1 + 2 + 2 + R_p9_obj -> ename_len;
+				}
 				/* handle permissions and rw access */
 			}
 			break;
@@ -223,38 +252,57 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			{//defining a scope in the case statement
 			int fid;
 			uint8_t *data;
+			//fprintf(stderr, "I am here!");
 			fid = T_p9_obj -> fid;
 			fnode = fid_table_find_fid(fid_table, fid);
 			assert(fnode != NULL);
+			//fprintf(stderr, "I am here tooooo\n");
 			data = (uint8_t *) malloc(T_p9_obj -> count * sizeof(uint8_t));
+			//fprintf(stderr, "before zeroing\n");
 			bzero(data, T_p9_obj -> count);
+			//fprintf(stderr, "after zeroing\n");
 			/* handling the directory case */
+			assert(fnode);
+			//fprintf(stderr, "fd is %d\n", fnode -> fd);
 			if(fnode -> fd == -1){ //this must be a directory then
 				struct dirent *entry;
 				int idx;
 				char *newpathname;
 				newpathname = (char *) malloc(1000 * sizeof(char));
 				idx = 0;
+				assert(fnode -> dd);
+#ifdef DEBUG
+				//fprintf(stderr, "Attempting to read directory %s\n", fnode -> dd);
+#endif
+
 				while((entry = readdir(fnode -> dd))){
+#ifdef DEBUG
+					//fprintf(stderr, "entry is %s\n", entry->d_name);
+#endif
 					char *entry_name;
 					stat_t *s;
 					bzero(newpathname, 1000);
 					strcpy(newpathname, fnode -> path);
-					if(!strcmp(entry->d_name, "."))
-						continue;
-					if(!strcmp(entry->d_name, ".."))
+					if((strcmp(entry->d_name, ".") == 0)  || (strcmp(entry->d_name, "..") == 0))
 						continue;
 					entry_name = entry->d_name;
 					newpathname = strcat(newpathname, "/");
 					newpathname = strcat(newpathname, entry_name);
 					s = (stat_t *) malloc(sizeof(stat_t));
+#ifdef DEBUG
+					//fprintf(stderr, "Attempting to create stat now\n");
+					//fprintf(stderr, "stating pathname: %s\n", newpathname);
+#endif
 					make_stat_from_UNIX_file(newpathname, s);
+					//int_to_buffer_bytes(get_stat_length(s) + 2, data, idx, 2);
+					//idx += 2;
 					encode_stat(s, data, idx, get_stat_length(s));
 					idx += (2 + get_stat_length(s));
 
 					destroy_stat(s);
 					/* just a quick hack */
-					if(idx > (T_p9_obj->count - 500)) break; //this is a safety factor to make sure we are not exceeding the Tcount
+					if(idx > ((90.0 / 100.0) * (float)(T_p9_obj->count))) break; //this is a safety factor to make sure we are not exceeding the Tcount
+					assert(idx <= T_p9_obj -> count);
 				}
 				free(newpathname);
 				R_p9_obj -> count = idx;
@@ -266,6 +314,7 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			/* handling the file case */
 			else{ //assuming it is a directory(however there are things other than files and directories)
 				int fd, count, read_bytes;
+				//fprintf(stderr, "inside else\n");
 				fd = fnode -> fd; /* the file descriptor of the *should be open* file */
 				count = T_p9_obj -> count;
 				read_bytes = UNIX_read(fd, data, T_p9_obj -> offset, count);
@@ -451,6 +500,6 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			break;
 		}//end of scope
 		default:
-			while(1);
+			break;
 	};
 }

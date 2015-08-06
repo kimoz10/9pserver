@@ -2,9 +2,9 @@
 #define NP_H
 
 #include <stdint.h>
-/*
+
 #define DEBUG 	1
-*/
+
 #define P9_NOTAG	(u16)(~0)
 #define P9_NOFID	(u32)(~0)
 #define P9_MAXWELEM	16

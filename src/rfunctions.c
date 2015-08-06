@@ -19,6 +19,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <strings.h>
+//#include "objLib.h"
 
 int permissions(struct stat *st){
 	int permissions;
@@ -55,12 +56,12 @@ void UNIX_stat_to_stat(char* filename, struct stat *st, stat_t *s){
 	UNIX_stat_to_qid(st, s->qid);
 	s -> uid = (char *) malloc(50);
 	s -> gid = (char *) malloc(50);
-	strncpy(s->uid, (getpwuid(st->st_uid))->pw_name, 49);
-	strncpy(s->gid, (getgrgid(st->st_gid))->gr_name, 49);
+	strcpy(s->uid, (getpwuid(st->st_uid))->pw_name);
+	strcpy(s->gid, (getgrgid(st->st_gid))->gr_name);
 	/* dont forget to assign muid */
 	s -> muid = "";
 	/* setting up the mode for the stat */
-	s->mode = ((((uint32_t) s->qid->type) << 24) | permissions(st));// & 0x80ffffff;
+	s->mode = ((((uint32_t) s->qid->type & 0x80) << 24) | permissions(st));
 	/* allowing all permissions for now since eventually it is going to run internally in ESX which can be considered relatively trusted
 	 * but this had to change later */
 }
@@ -88,7 +89,8 @@ void make_stat_from_UNIX_file(char *pathname, stat_t *s){
 }
 
 int is_file_exists(char *newpathname){
-	return access(newpathname, F_OK);
+	struct stat buffer;
+	return (lstat(newpathname, &buffer) == 0);
 }
 
 void create_directory(char *pathname, char* filename){
@@ -156,19 +158,43 @@ void UNIX_change_permissions(char *path, uint32_t mode){
 
 }
 
-int UNIX_read(int fd, uint8_t *data, unsigned long long offset, int count){
+int UNIX_read(int fd, uint8_t *data, unsigned long long offset, unsigned int count){
 	lseek(fd, offset, SEEK_SET);
 	return read(fd, data, count);
 }
 
 
-int UNIX_write(int fd, unsigned long long offset, uint8_t *data, int count){
+int UNIX_write(int fd, unsigned long long offset, uint8_t *data, unsigned int count){
 	int n;
 	lseek(fd, offset, SEEK_SET);
 	n = write(fd, data, count);
 	return n;
 }
+/*
+int ESX_read(ObjHandle handleID, uint8_t *buffer, uint64_t offset, unsigned int count){
+	ObjLibError err;
+	err = ObjLib_Pread(handleID, (void *) buffer, count, offset);
+	if(ObjLib_IsSuccess(err)){
+		/// should return number of bytes read
+		return count;
+	}
+	else{
+		return -1;
+	}	
+}
 
+int ESX_write(ObjHandle handleID, uint64_t offset, uint8_t *data, unsigned int count){
+	ObjLibError err;
+	err = ObjLib_Pwrite(handleID, (void *)data, count, offset);
+	if(ObjLib_IsSuccess(err)){
+		//// should return the number of bytes written
+		return count;
+	}
+	else{
+		return -1;
+	}
+}
+*/
 int UNIX_remove(char *path){
 	return remove(path);
 }

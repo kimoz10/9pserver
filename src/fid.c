@@ -12,6 +12,8 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <string.h>
+#include <assert.h>
+
 struct fid_list *create_fid_list(){
 	fid_list *flist;
 	flist = (fid_list *) malloc(sizeof(fid_list));
@@ -183,3 +185,30 @@ int fid_table_remove_fid(fid_list **fid_table, uint32_t fid){
 	}
 	return remove_fid_from_list(fid_table[entry], fid);
 }
+
+static int fid_list_get_size(fid_list *flist){
+	int size;
+	size = 0;
+	assert(flist != NULL);
+	if(flist -> head == NULL) return 0;
+	fid_node *current = flist -> head;
+	while(current != NULL){
+		size++;
+		current = current -> next;
+	}
+	return size;
+}
+/* TODO */
+/* naive implementation, improving it requires some refactoring of the fid_table data structure */
+int get_fid_count(fid_list **fid_table){
+	int fid_count;
+	int i;
+	fid_count = 0;
+	for(i = 0; i < HTABLE_SIZE; i++){
+		fid_list *flist = fid_table[i];
+		if(flist == NULL) continue;
+		fid_count += fid_list_get_size(flist);
+	}
+	return fid_count;
+}
+
