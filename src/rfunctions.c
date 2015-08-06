@@ -54,10 +54,10 @@ void UNIX_stat_to_stat(char* filename, struct stat *st, stat_t *s){
 	s->dev = 0;
 	s->qid = (qid_t *) malloc(sizeof(qid_t));
 	UNIX_stat_to_qid(st, s->qid);
-	s -> uid = (char *) malloc(50);
-	s -> gid = (char *) malloc(50);
-	strcpy(s->uid, (getpwuid(st->st_uid))->pw_name);
-	strcpy(s->gid, (getgrgid(st->st_gid))->gr_name);
+	s -> uid = (char *) malloc(7);
+	s -> gid = (char *) malloc(7);
+	strcpy(s->uid, "nobody");
+	strcpy(s->gid, "nobody");
 	/* dont forget to assign muid */
 	s -> muid = "";
 	/* setting up the mode for the stat */
