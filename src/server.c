@@ -110,9 +110,9 @@ void thread_function(void *newsockfd_ptr){
 	fid_list **fid_table;
 	fid_table = fid_table_init();
 	/* end of fid_table allocation */
-        assert(fid_table[0] == NULL);
-        /* TODO: put a reasonable buffer size */
-        buffer = (uint8_t *)malloc(9000 * sizeof(char));
+    assert(fid_table[0] == NULL);
+    /* TODO: msize should be the minimum of 9000 and the one offered by the client */
+    buffer = (uint8_t *)malloc(9000 * sizeof(char));
    	bzero(buffer, 256);
 	T_p9_obj = (p9_obj_t *) malloc (sizeof(p9_obj_t));
 	R_p9_obj = (p9_obj_t *) malloc(sizeof(p9_obj_t));
@@ -124,7 +124,7 @@ void thread_function(void *newsockfd_ptr){
 	fid_count = 0;
 	attach_flag = 0;
 	while(1){
-	        int size;
+	    int size;
 		int read_bytes;
 		size = 0;
 		n = read(newsockfd, buffer, 4);
@@ -182,14 +182,20 @@ void thread_function(void *newsockfd_ptr){
 		/***************************/
 		if(T_p9_obj -> type == P9_TATTACH) attach_flag = 1;
 		fid_count = get_fid_count(fid_table);
+#ifdef DEBUG
 		printf("fid_count_is %d\n", fid_count);
+#endif
 		destroy_p9_obj(T_p9_obj);
 		destroy_p9_obj(R_p9_obj);
 		destroy_p9_obj(test_p9_obj);
 		free(Rbuffer);
+#ifdef DEBUG
 		printf("attach flag is %d\n", attach_flag);
+#endif
 		if((attach_flag == 1) && (fid_count ==0)){
+#ifdef DEBUG
 			printf("Connection is closing \n");
+#endif
 			break;
 		}
 	}
@@ -231,7 +237,6 @@ int main(int argc, char *argv[])
 	clilen = sizeof(cli_addr);
 	while(1){
 		int err;
-		//fprintf(stderr, "Server is now accepting new connections...\n");
 		newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, (socklen_t *) &clilen);
 		if(newsockfd < 0)
 			exit(1);
@@ -239,8 +244,6 @@ int main(int argc, char *argv[])
 			printf("Error %d while adding job to the job queue\n", err);
 			exit(1);
 		}
-
-		//fprintf(stderr, "returned from thread function\n");
 	}
 	//ObjLib_Exit();
 	close(sockfd);

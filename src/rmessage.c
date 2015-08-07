@@ -182,6 +182,9 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			}
 			break;
 		case P9_TOPEN:
+		{
+			int p9_mode;
+			p9_mode = 0;
 			fnode = fid_table_find_fid(fid_table, T_p9_obj -> fid);
 			assert(fnode != NULL);
 			assert(fnode -> fid == T_p9_obj -> fid);
@@ -202,33 +205,47 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 					printf("UNFAMILIAR MODE %d\n", T_p9_obj->mode);
 					exit(1);
 				}
-				switch(T_p9_obj -> mode){
-				case 0:
+				switch(T_p9_obj -> mode & 3){
+					case 0:
 #ifdef DEBUG
-					printf("opening file %s for read only\n", fnode -> path);
+						printf("opening file %s for read only\n", fnode -> path);
 #endif
-					
-					fd = open(fnode -> path, O_RDONLY);
-					break;
-				case 1:
+						p9_mode = O_RDONLY;
+						break;
+					case 1:
 #ifdef DEBUG
-					printf("opening file %s for write only\n", fnode -> path);
+						printf("opening file %s for write only\n", fnode -> path);
 #endif
-					fd = open(fnode->path, O_WRONLY | O_TRUNC);
-					break;
-				case 2:
+						p9_mode = O_WRONLY;
+						break;
+					case 2:
 #ifdef DEBUG
-					printf("opening file %s for read write\n", fnode -> path);
+						printf("opening file %s for read write\n", fnode -> path);
 #endif
-					fd = open(fnode -> path, O_RDWR);
-					break;
-				default:
-					printf("mode is different\n");
-					printf(" %d\n", T_p9_obj -> mode);
-					exit(1);
+						p9_mode = O_RDWR;
+						break;
+					case 3:
+						p9_mode = O_RDONLY;
+						break;
+					default:
+						printf("You should never reach here\n");
+						exit(1);
 				}
+				if (T_p9_obj -> mode & 0x10)
+					p9_mode |= O_TRUNC;
 
+				if (T_p9_obj -> mode & 0x80)
+				    p9_mode |= O_APPEND;
+
+				if (T_p9_obj -> mode & 0x04l)
+				    p9_mode |= O_EXCL;
+
+				/* Opening the file based on the requested mode */
+				fd = open(fnode -> path, p9_mode);
+
+				/* Assigning the file descriptor to the fid node */
 				fnode -> fd = fd;
+
 				if(fnode -> fd == -1){
 					R_p9_obj -> type =  P9_RERROR;
 					R_p9_obj -> ename_len = strlen(strerror(errno));
@@ -252,6 +269,7 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 				/* handle permissions and rw access */
 			}
 			break;
+		} // ending case scope
 		case P9_TREAD:
 			{//defining a scope in the case statement
 			int fid;
