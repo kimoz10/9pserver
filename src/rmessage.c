@@ -322,11 +322,21 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 				fd = fnode -> fd; /* the file descriptor of the *should be open* file */
 				count = T_p9_obj -> count;
 				read_bytes = UNIX_read(fd, data, T_p9_obj -> offset, count);
-				R_p9_obj -> count = read_bytes;
-				R_p9_obj -> data = data;
-				R_p9_obj -> size = 4 + 2 + 4 + 1 + R_p9_obj -> count;
-				R_p9_obj -> tag = T_p9_obj -> tag;
-				R_p9_obj -> type = P9_RREAD;
+				if(read_bytes >= 0){
+					R_p9_obj -> count = read_bytes;
+					R_p9_obj -> data = data;
+					R_p9_obj -> size = 4 + 2 + 4 + 1 + R_p9_obj -> count;
+					R_p9_obj -> tag = T_p9_obj -> tag;
+					R_p9_obj -> type = P9_RREAD;
+				}
+				else{
+					R_p9_obj -> type =  P9_RERROR;
+					R_p9_obj -> ename_len = strlen(strerror(errno));
+					R_p9_obj -> ename = (char *) malloc(R_p9_obj -> ename_len + 1);
+					bzero(R_p9_obj -> ename, R_p9_obj -> ename_len + 1);
+					strcpy(R_p9_obj -> ename, strerror(errno));
+					R_p9_obj -> size = 4 + 1 + 2 + 2 + R_p9_obj -> ename_len;
+				}
 			}
 
 			break;
