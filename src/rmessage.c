@@ -532,6 +532,11 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			destroy_stat(s_old);
 			break;
 		}//end of scope
+		case P9_TFLUSH:
+			R_p9_obj -> size = 7;
+			R_p9_obj -> tag = T_p9_obj -> tag;
+			R_p9_obj -> type = P9_RFLUSH;
+			break;
 		default:
 			break;
 	};
