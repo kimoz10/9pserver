@@ -332,6 +332,7 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 				else{
 					R_p9_obj -> type =  P9_RERROR;
 					R_p9_obj -> ename_len = strlen(strerror(errno));
+					R_p9_obj -> tag = T_p9_obj -> tag;
 					R_p9_obj -> ename = (char *) malloc(R_p9_obj -> ename_len + 1);
 					bzero(R_p9_obj -> ename, R_p9_obj -> ename_len + 1);
 					strcpy(R_p9_obj -> ename, strerror(errno));
