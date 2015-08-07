@@ -194,7 +194,7 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 			R_p9_obj -> qid = (qid_t *) malloc(sizeof(qid_t));
 			make_qid_from_UNIX_file(fnode->path, R_p9_obj -> qid);
 			R_p9_obj -> iounit = 0;
-			if(R_p9_obj -> qid -> type == 0 ){ //this is a regular file
+			if(R_p9_obj -> qid -> type == 0 || R_p9_obj -> qid -> type == 2){ //this is a regular file or a symbolic link
 				int fd;
 				fd = -1;
 				assert((T_p9_obj -> mode & 0x10) != 0x10 );
@@ -231,9 +231,11 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 				fnode -> fd = fd;
 				if(fnode -> fd == -1){
 					R_p9_obj -> type =  P9_RERROR;
-                                        R_p9_obj -> ename = strerror(errno);
-                                        R_p9_obj -> ename_len = strlen(R_p9_obj -> ename);
-                                        R_p9_obj -> size = 4 + 1 + 2 + 2 + R_p9_obj -> ename_len;
+					R_p9_obj -> ename_len = strlen(strerror(errno));
+					R_p9_obj -> ename = (char *) malloc(R_p9_obj -> ename_len + 1);
+					bzero(R_p9_obj -> ename, R_p9_obj -> ename_len + 1);
+					strcpy(R_p9_obj -> ename, strerror(errno));
+					R_p9_obj -> size = 4 + 1 + 2 + 2 + R_p9_obj -> ename_len;
 				}
 				else assert(fnode -> fd != -1);
 			}
@@ -241,8 +243,10 @@ void prepare_reply(p9_obj_t *T_p9_obj, p9_obj_t *R_p9_obj, fid_list **fid_table)
 				fnode -> dd = opendir(fnode -> path);
 				if(fnode -> dd == NULL){
 					R_p9_obj -> type =  P9_RERROR;
-					R_p9_obj -> ename = strerror(errno);
-				        R_p9_obj -> ename_len = strlen(R_p9_obj -> ename);
+					R_p9_obj -> ename_len = strlen(strerror(errno));
+					R_p9_obj -> ename = (char *) malloc(R_p9_obj -> ename_len + 1);
+					bzero(R_p9_obj -> ename, R_p9_obj -> ename_len + 1);
+				    strcpy(R_p9_obj -> ename, strerror(errno));
 					R_p9_obj -> size = 4 + 1 + 2 + 2 + R_p9_obj -> ename_len;
 				}
 				/* handle permissions and rw access */
