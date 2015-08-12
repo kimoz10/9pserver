@@ -124,7 +124,7 @@ void thread_function(void *newsockfd_ptr){
 	fid_count = 0;
 	attach_flag = 0;
 	while(1){
-	    int size;
+	    	int size;
 		int read_bytes;
 		size = 0;
 		n = read(newsockfd, buffer, 4);
@@ -138,7 +138,7 @@ void thread_function(void *newsockfd_ptr){
 		}
 		assert(read_bytes == (size - 4));
 #ifdef DEBUG
-		for(i = 0; i < n; i++){
+		for(i = 0; i < size; i++){
 			fprintf(stderr, "%d ", buffer[i]);
 		}
 
